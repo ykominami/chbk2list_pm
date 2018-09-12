@@ -14,11 +14,13 @@ use File::Basename;
 use File::Spec;
 
 require 'chbk2list.pm';
+require 'outlineop.pm';
 
 my $bkfname = $ARGV[0];
 my $ofname = $ARGV[1];
 my ($basename, $dirname, $ext) = fileparse($ofname , qr/\..*$/);
 my $category_ofname = File::Spec->catfile( $dirname , $basename . "_category" . $ext);
+my $category_indent_ofname = File::Spec->catfile( $dirname , $basename . "_category_indent" . $ext);
 
 my $delimitor = "\t";
 #my $delimitor = '|';
@@ -32,6 +34,7 @@ my $added_count = 0;
 
 open my $ofh , ">" , $ofname or die "failed to open $!";
 open my $category_ofh , ">" , $category_ofname or die "failed to open $!";
+open my $category_indent_ofh , ">" , $category_indent_ofname or die "failed to open $!";
 
 my $url = 'http://localhost:4567';
 
@@ -47,9 +50,11 @@ foreach my $v ($chbk->get_bookmark_list) {
 	$last_modified = "";
     }
     if ( $lines == 0 ){
-	print $ofh join($delimitor , ('category' , 'title' , 'href' , 'add_date', 'last_modified') ) , "\n";
+#	print $ofh join($delimitor , ('category' , 'title' , 'href' , 'add_date', 'last_modified') ) , "\n";
+	print $ofh join($delimitor , ('category' , 'title' , 'href' , 'add_date') ) , "\n";
     }
-    print $ofh join($delimitor , ($category , $title , $href , $add_date, $last_modified) ) , "\n";
+#    print $ofh join($delimitor , ($category , $title , $href , $add_date, $last_modified) ) , "\n";
+    print $ofh join($delimitor , ($category , $title , $href , $add_date) ) , "\n";
     $lines++;
 }
 
@@ -63,3 +68,13 @@ for my $k ( sort (keys %{$hs}) ){
     print $category_ofh  $string, "\n";
 }
 close $category_ofh;
+
+
+my @ks = sort (keys %{$hs});
+my $olop = Outlineop->new( \@ks , $category_indent_ofh );
+$olop->print_tab_open_and_attr( "opml" , "version" , "1.0");
+$olop->print_header;
+$olop->output_outline;
+$olop->print_tab_close( "opml" ); 
+
+close $category_indent_ofh;

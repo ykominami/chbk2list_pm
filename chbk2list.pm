@@ -38,21 +38,28 @@ sub assign_name_to_ancestor_h1 {
     $self->register_item( $dl , $body_title , "" , "" );
 }
 
+# ルートから引数itemまでのタグの階層構造を、ブックマーク中のフォルダの階層構造として取り出す。
+# <DL>タグの直下の（子の）<DT>タグのテキストを、フォルダ名とする。
+# ルートから、フォルダ名を"/"でつなげたもので、引数itemまでのフォルダの階層構造を表す
 sub register_hier_item {
     my $self = shift;
     my $item = shift;
 
+    # $itemからルートまでの階層構造をなす要素を（昇順-itemが先頭、rootが最後になる)配列で得る
     my @rev_hier = $item->lineage();
-    # /home/bodyの部分を取り除く
+    my $rev_hier_len = @rev_hier;
+    # /home/bodyの部分を取り除く（配列の最後から2個取り除く）
     pop(@rev_hier);
     pop(@rev_hier);
-    # $itemを最下部として追加する
+    # $itemを最下部として追加する（配列の先頭に追加する）
     unshift(@rev_hier , $item);
     # 階層をトップダウンで表すように配列要素を反転する
     my @hier = reverse(@rev_hier);
-    
+
+    #     
     List::Util::reduce {
-        $self->register_item( $b , undef , $b->{add_date} , $b->{last_modified} );
+#        $self->register_item( $b , undef , $b->{add_date} , $b->{last_modified} );
+        $self->register_item( $b , undef , undef , undef );
         push(@$a , $self->{item_hs}->{$b});
         $self->{item_hs}->{$b}->{hier} = $a;
         $a;
@@ -72,12 +79,14 @@ sub register_item {
             label => undef ,
             item => $item,
             hier => [],
-            call_count => 1,
-            call_count_title => 0,
+#            call_count => 1,
+	    #            call_count_title => 0,
+	    title => $title,
 	    add_date => $add_date,
 	    last_modified => $last_modified,
         };
     }
+
     else{
         if( !defined( $self->{item_hs}->{$item}->{name} ) ){
             $self->{item_hs}->{$item}->{name} = $item->tag;
@@ -91,7 +100,10 @@ sub register_item {
         if( !defined( $self->{item_hs}->{$item}->{hier} ) ){
             $self->{item_hs}->{$item}->{hier} = $item;
         } 
-        $self->{item_hs}->{$item}->{call_count} += 1;
+	if( !defined($self->{item_hs}->{$item}->{title}) ){
+	    $self->{item_hs}->{$item}->{title} = $title;
+	}
+#        $self->{item_hs}->{$item}->{call_count} += 1;
 	if( !defined( $self->{item_hs}->{$item}->{add_date} ) ){
 	    $self->{item_hs}->{$item}->{add_date} = $add_date;
 	}
@@ -99,6 +111,7 @@ sub register_item {
 	    $self->{item_hs}->{$item}->{last_modified} = $last_modified;
 	}
     }
+=pod    
     if( defined($title) ){
         $self->{item_hs}->{$item}->{title} = $title;
         $self->{item_hs}->{$item}->{call_count_title} += 1;
@@ -107,6 +120,7 @@ sub register_item {
     if( !defined($self->{item_hs}->{$item}->{title}) ){
 #        print "not defined title\n";
     }
+=cut
 }
 
 sub get_dt_text{
@@ -235,8 +249,10 @@ sub listup{
     my $tree = $self->{tree};
     my @ary = ();
 
+    # <A>はブックマークの1個の項目。HTMLの構文上は<DT><A>..</A>
     foreach my $t ( $self->{tree}->find("a") ) {
         my $str = "";
+	# parentは<DT>
         my $parent = $t->parent();
 
         my $list = $self->{item_hs}->{$parent}->{hier};
@@ -244,6 +260,7 @@ sub listup{
             $self->register_hier_item($parent);
             $list = $self->{item_hs}->{$parent}->{hier};
         }
+
 	my $add_date = $self->{item_hs}->{$parent}->{add_date};
 	my $last_modified = $self->{item_hs}->{$parent}->{last_modified};
 
@@ -258,39 +275,35 @@ sub listup{
         if( $num > 0 ){
 	    my @lx = grep { $_->{name} eq "dl" } @{$list};
 	    
-            my @ax  = List::MoreUtils::apply {
-                $_ = $_->{title};
-            } @lx;
-
             $str = "";
-            if ($#ax > 0 ){
+            if ($#lx > 0 ){
                 my $last_item = List::Util::reduce {
 		    my $label;
-
-		    if( !defined($b->{title}) ){
-			$b->{title} = "";
+		    my $bk = $b->{item};
+		    my $bb = $self->{item_hs}->{$bk};
+		    if( !defined($bb->{title}) ){
+			$bb->{title} = "";
 		    }
 		    
 		    if( defined($a) ){
 			if( defined($a->{label}) ){
-			    $label = $a->{label} . '/' . $b->{title};
+			    $label = $a->{label} . '/' . $bb->{title};
 			}
 			else{
-			    $label = $b->{title};
+			    $label = $bb->{title};
 			}
 		    }
 		    else{
-			$label = $b->{title};
+			$label = $bb->{title};
 		    }
-		    $b->{label} = $label;
+		    $bb->{label} = $label;
 		    if( !defined( $self->{category}->{$label} ) ){
 			$self->{category_by_name}->{$label} = {};
-			$self->{category_by_name}->{$label}->{add_date} = $b->{add_date};
-			$self->{category_by_name}->{$label}->{last_modified} = $b->{last_modified};
+			$self->{category_by_name}->{$label}->{add_date} = $bb->{add_date};
+			$self->{category_by_name}->{$label}->{last_modified} = $bb->{last_modified};
 		    }
-		    $b;
+		    $bb;
 		} undef, @lx;
-		#                $str = List::Util::reduce { $a . '/' . $b} @ax;
 		$str = $last_item->{label};
 
             }
